@@ -1,0 +1,85 @@
+name: Unpack zip
+
+# Drop any .zip in the repo root, push it, and this extracts the contents,
+# commits them, and deletes the zip. Also runnable manually.
+on:
+  push:
+    paths:
+      - "*.zip"
+  workflow_dispatch:
+    inputs:
+      zip:
+        description: "Path to the zip (blank = every zip in the repo root)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: unpack-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find zips
+        id: find
+        run: |
+          set -euo pipefail
+          if [ -n "${{ github.event.inputs.zip }}" ]; then
+            zips="${{ github.event.inputs.zip }}"
+          else
+            zips=$(find . -maxdepth 1 -name '*.zip' -printf '%P\n')
+          fi
+          if [ -z "$zips" ]; then
+            echo "No zip found — nothing to do."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          { echo 'zips<<EOF'; echo "$zips"; echo 'EOF'; } >> "$GITHUB_OUTPUT"
+
+      - name: Extract
+        if: steps.find.outputs.found == 'true'
+        run: |
+          set -euo pipefail
+          while IFS= read -r z; do
+            [ -n "$z" ] || continue
+            echo "::group::$z"
+            tmp=$(mktemp -d)
+            unzip -q -o "$z" -d "$tmp"
+
+            # If the archive has exactly one top-level directory, keep it as-is
+            # (loopstream/...). If it's a bare set of files, they land at root.
+            rsync -a --exclude '.git' "$tmp"/ ./
+
+            rm -rf "$tmp"
+            rm -f "$z"
+            echo "::endgroup::"
+          done <<< "${{ steps.find.outputs.zips }}"
+
+          # Zip metadata doesn't always survive; make shell scripts executable
+          # so git records mode 100755.
+          find . -path ./.git -prune -o -name '*.sh' -print0 | xargs -0 -r chmod +x
+
+      - name: Commit
+        if: steps.find.outputs.found == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing changed."
+            exit 0
+          fi
+          git commit -m "Unpack zip [skip ci]"
+          # Someone may have pushed while we were extracting.
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

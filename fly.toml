@@ -1,0 +1,29 @@
+app = "loopstream"
+primary_region = "iad"   # put this near your Restream ingest region
+
+# No [http_service] / [[services]]: pure outbound worker. No public IP, no
+# health-check machinery, no $2/mo IPv4, nothing to auto-stop.
+
+swap_size_mb = 256
+
+[env]
+  VIDEO_URL     = "https://files.catbox.moe/example.mp4"
+  RTMP_URL      = "rtmp://live.restream.io/live"
+  MAX_HOURS     = "6"
+  STALL_TIMEOUT = "45"
+  REFRESH       = "0"     # 1 = re-fetch the URL between sessions
+  VB            = "1800k" # only used if the source needs transcoding
+
+[[vm]]
+  size   = "shared-cpu-1x"
+  memory = "512mb"        # 256mb works too, unless you rely on boot transcoding
+
+[[restart]]
+  policy = "always"
+  retries = 0
+
+# Optional: persist the normalized loop across restarts so a machine reboot
+# doesn't re-download and re-encode. ~$0.15/mo for 1 GB.
+# [[mounts]]
+#   source = "loopcache"
+#   destination = "/var/cache/loopstream"

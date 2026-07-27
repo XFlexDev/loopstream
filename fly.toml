@@ -7,7 +7,7 @@ primary_region = "iad"   # put this near your Restream ingest region
 swap_size_mb = 256
 
 [env]
-  VIDEO_URL     = "https://litter.catbox.moe/6ge425.mov"
+  VIDEO_URL     = "https://huggingface.co/buckets/misukisu/imm/resolve/copy_AFEE0C40-CF77-4571-8AEE-DD637BA33699.mov"
   RTMP_URL      = "rtmp://live.restream.io/live"
   MAX_HOURS     = "60"
   STALL_TIMEOUT = "45"

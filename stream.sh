@@ -18,14 +18,20 @@ die() { log "FATAL: $*"; exit 1; }
 
 mkdir -p "$CACHE_DIR" || die "cannot create $CACHE_DIR"
 KEY=$(printf '%s' "$VIDEO_URL" | md5sum | cut -c1-16)
+SRC="$CACHE_DIR/src-$KEY"
 LOOP="$CACHE_DIR/loop-$KEY.mp4"
 
 fetch() {
   log "downloading raw video from $VIDEO_URL"
   curl -fL --retry 8 --retry-delay 5 --retry-all-errors \
        --connect-timeout 20 --max-time 1800 \
-       -C - -o "$LOOP.part" "$VIDEO_URL" || return 1
-  mv "$LOOP.part" "$LOOP"
+       -C - -o "$SRC.part" "$VIDEO_URL" || return 1
+  mv "$SRC.part" "$SRC"
+
+  log "remuxing to faststart mp4 without transcoding..."
+  ffmpeg -v error -y -i "$SRC" -c copy -movflags +faststart "$LOOP" || return 1
+  rm -f "$SRC"
+
   find "$CACHE_DIR" -type f ! -name "*$KEY*" -delete 2>/dev/null
   log "ready: $LOOP ($(du -h "$LOOP" | cut -f1))"
 }
@@ -44,20 +50,23 @@ trap shutdown TERM INT
 
 BACKOFF=5
 until prepare; do
-  log "download failed, retrying in 30s"
-  rm -f "$LOOP.part"
+  log "download/remux failed, retrying in 30s"
+  rm -f "$SRC.part" "$LOOP"
   sleep 30
 done
 
 while :; do
   : > "$PROGRESS"
-  log "connecting to $RTMP_URL (zero transcode, pure copy)"
+  log "connecting to $RTMP_URL (pure copy loop)"
 
   ffmpeg -hide_banner -nostdin -nostats -loglevel error \
-    -fflags +genpts \
-    -re -stream_loop -1 -i "$LOOP" \
-    -c copy -copyts -avoid_negative_ts make_zero \
-    -max_muxing_queue_size 128 \
+    -re \
+    -stream_loop -1 \
+    -fflags +genpts+igndts \
+    -i "$LOOP" \
+    -c copy \
+    -use_wallclock_as_timestamps 1 \
+    -max_muxing_queue_size 1024 \
     -progress "$PROGRESS" \
     -f flv -flvflags no_duration_filesize \
     "$RTMP_URL/$STREAM_KEY" &

@@ -1,4 +1,4 @@
-# fly.toml app configuration file generated for loopstream on 2026-07-27T19:28:38Z
+# fly.toml app configuration file generated for loopstream on 2026-07-27T19:34:41Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
@@ -24,11 +24,11 @@ swap_size_mb = 256
   memory = '512mb'
 
 [[vm]]
-  size = 'performance-cpu-1x'
-  memory = '8gb'
-  cpu_kind = 'performance'
+  size = 'shared-cpu-1x'
+  memory = '1gb'
+  cpu_kind = 'shared'
   cpus = 1
-  memory_mb = 8192
+  memory_mb = 1024
   processes = ['app']
 
 [[restart]]

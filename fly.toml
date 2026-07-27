@@ -1,3 +1,8 @@
+# fly.toml app configuration file generated for loopstream on 2026-07-27T19:28:38Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
 app = "loopstream"
 primary_region = "iad"   # put this near your Restream ingest region
 
@@ -15,8 +20,16 @@ swap_size_mb = 256
   VB            = "1800k" # only used if the source needs transcoding
 
 [[vm]]
-  size   = "shared-cpu-1x"
-  memory = "512mb"        # 256mb works too, unless you rely on boot transcoding
+  size = 'shared-cpu-1x'
+  memory = '512mb'
+
+[[vm]]
+  size = 'performance-cpu-1x'
+  memory = '8gb'
+  cpu_kind = 'performance'
+  cpus = 1
+  memory_mb = 8192
+  processes = ['app']
 
 [[restart]]
   policy = "always"
